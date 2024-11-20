@@ -1,56 +1,195 @@
 <script lang="ts">
-    import { Button } from 'flowbite-svelte';
-    import { get, writable } from 'svelte/store';
+    import { Button, Input } from 'flowbite-svelte';
 
-    const amount = writable(0); // Store for the amount input
+    interface TaskDetails {
+        id: number;
+        name: string;
+        status: string;
+    }
 
-    async function handleAction(action: string) {
-        let response;
-        const amountValue = get(amount); // Get the current amount value
+    interface Transaction {
+        type: string;
+        amount: number;
+        balanceAfter: number;
+        timestamp: string;
+    }
 
-        switch (action) {
-            case 'Withdraw':
-                response = await fetch('/api/withdraw', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ amount: amountValue })
-                });
-                break;
-            case 'Deposit':
-                response = await fetch('/api/deposit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ amount: amountValue })
-                });
-                break;
-            case 'Balance':
-                response = await fetch('/api/balance', { method: 'GET' });
-                break;
-            case 'Exit':
-                response = await fetch('/api/exit', { method: 'POST' });
-                break;
-            default:
-                alert('Unknown action');
-                return;
+    let tasks: TaskDetails[] = $state([]);
+    let taskName = $state('');
+    let taskStatus = $state('');
+    let balance = $state(0);
+    let pin = '1234';
+    let enteredPin = $state('');
+    let isAuthenticated = $state(false);
+    let transactionHistory: Transaction[] = $state([]);
+
+    let depositAmount = $state(0);
+    let withdrawAmount = $state(0);
+    let newPin = $state('');
+    let confirmPin = $state('');
+
+    let showModal = $state(false);
+    let modalMessage = $state('');
+    let actionType = $state('');
+    let amountInput = $state(0); // New state for input amount
+
+    function openModal(message: string, action: string) {
+        modalMessage = message;
+        actionType = action;
+        amountInput = 0; // Reset input amount when opening modal
+        showModal = true;
+    }
+
+    function closeModal() {
+        showModal = false;
+    }
+
+    function confirmAction() {
+    closeModal();
+    if (actionType === 'deposit') {
+        deposit(amountInput);
+    } else if (actionType === 'withdraw') {
+        withdraw(amountInput);
+    } else if (actionType === 'checkBalance') {
+        alert(`Current balance: $${balance}`); // Show balance in an alert
+    } else if (actionType === 'exit') {
+        isAuthenticated = false; // Go back to authentication
+        alert("Exiting the application. Please log in again."); // Optional message
+    } else if (actionType === 'resetUser ') {
+        resetUser ();
+    } else if (actionType === 'changePin') {
+        changePin();
+    }
+}
+
+    function deposit(amount: number) {
+        if (amount <= 0) {
+            alert("Deposit amount must be greater than zero.");
+            return;
         }
-
-        if (response.ok) {
-            const data = await response.json();
-            alert(`Success: ${data.message}`);
-            if (data.balance !== undefined) {
-                // Update the balance if available
-                console.log(`New Balance: $${data.balance}`);
-            }
+        if (balance + amount <= 150000) {
+            balance += amount;
+            recordTransaction('Deposit', amount);
         } else {
-            const errorData = await response.json();
-            alert(`Error: ${errorData.message}`);
+            alert("Cannot deposit: Maximum balance limit of $150,000 exceeded.");
+        }
+    }
+
+    function withdraw(amount: number) {
+        if (amount <= 0) {
+            alert("Withdrawal amount must be greater than zero.");
+            return;
+        }
+        if (amount <= balance) {
+            balance -= amount;
+            recordTransaction('Withdrawal', amount);
+        } else {
+            alert("Insufficient balance");
+        }
+    }
+
+    function recordTransaction(type: string, amount: number) {
+        transactionHistory.push({
+            type,
+            amount,
+            balanceAfter: balance,
+            timestamp: new Date().toLocaleString(),
+        });
+    }
+
+    function authenticate() {
+        if (enteredPin === pin) {
+            isAuthenticated = true;
+        } else {
+            alert("Incorrect PIN");
+        }
+    }
+
+    function exit() {
+        openModal("Are you sure you want to exit?", 'exit');
+    }
+
+    function resetUser  () {
+        openModal("Are you sure you want to reset the user?", 'resetUser  ');
+    }
+
+    function changePin() {
+        if (newPin === confirmPin && newPin.length === 4) {
+            pin = newPin;
+            alert("PIN changed successfully!");
+            newPin = '';
+            confirmPin = '';
+        } else {
+            alert("PINs do not match or are invalid.");
         }
     }
 </script>
 
-<input type="number" bind:value={$amount} placeholder="Enter amount" class="border p-2" />
+<main class="flex flex-col h-screen p-8 bg-gray-100">
+    <div class="max-w-full mx-auto bg-blue-800 shadow-lg rounded-lg p-6 flex-1">
+        {#if !isAuthenticated}
+        <h2 class="text-xl font-bold mb-4 text-center">BD<span style="color: yellow">O</span></h2>
+        <div class="grid grid-cols-1 gap-4 w-full">
+            <Input placeholder="Enter your PIN" bind:value={enteredPin} type="password" class ="border-2 border-yellow-500 rounded-lg w-full" />
+            <Button color="yellow" class="w-full" onclick={authenticate}>Authenticate</Button>
+        </div>
+        {:else}
+            <h2 class="text-xl font-bold mb-4 text-center">Welcome to BDO ATM</h2>
+            <div class="grid grid-cols-2 gap-4 mt-4">
+                <Button color="yellow" class="w-full" onclick={() => openModal("Enter deposit amount:", 'deposit')}>Deposit</Button>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mt-4">
+                <Button color="yellow" class="w-full" onclick={() => openModal("Enter withdrawal amount:", 'withdraw')}>Withdraw</Button>
+            </div>
 
-<Button class="bg-green-500 hover:bg-green-600 text-white" on:click={() => handleAction('Withdraw')}>Withdraw</Button>
-<Button class="bg-green-500 hover:bg-green-600 text-white" on:click={() => handleAction('Deposit')}>Deposit</Button>
-<Button class="bg-green-500 hover:bg-green-600 text-white" on:click={() => handleAction('Balance')}>Balance</Button>
-<Button class="bg-green-500 hover:bg-green-600 text-white" on:click={() => handleAction('Exit')}>Exit</Button>
+            <div class="grid grid-cols-2 gap-4 mt-4">
+                <Button color="yellow" class="w-full" onclick={() => openModal("Current balance: $" + balance, 'checkBalance')}>Check Balance</Button>
+                <Button color="yellow" class="w-full" onclick={exit}>Exit</Button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mt-4">
+                <Button color="yellow" class="w-full mt-2" onclick={() => openModal("Are you sure you want to change your PIN?", 'changePin')}>Change PIN</Button>
+            </div>
+
+            <div class="mt-4">
+                <h3 class="text-lg font-semibold">Change PIN</h3>
+                <Input placeholder="New PIN" bind:value={newPin} type="password" class="border-2 border-yellow-500 rounded-lg w-full" />
+                <Input placeholder="Confirm New PIN" bind:value={confirmPin} type="password" class="border-2 border-yellow-500 rounded-lg w-full" />
+            </div>
+
+            <div class="mt-4">
+                <p class="font-bold">Current Balance: $<span class="text-black-600">{balance}</span></p>
+            </div>
+
+            <div class="mt-4">
+                <h3 class="text-lg font-semibold">Transaction History</h3>
+                {#if transactionHistory.length > 0}
+                    <ul class="list-disc pl-5">
+                        {#each transactionHistory as transaction}
+                            <li>{transaction.timestamp}: {transaction.type} of $<span class="font-semibold">{transaction.amount}</span>. Balance after: $<span class="font-semibold">{transaction.balanceAfter}</span></li>
+                        {/each}
+                    </ul>
+                {:else}
+                    <p>No transactions yet.</p>
+                {/if}
+            </div>
+
+            <Button color="red" class="w-full mt-4" onclick={resetUser }>Reset User</Button>
+        {/if}
+    </div>
+
+    {#if showModal}
+    <div class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <h3 class="text-lg font-semibold">{modalMessage}</h3>
+            {#if actionType === 'deposit' || actionType === 'withdraw'}
+                <Input placeholder="Amount" bind:value={amountInput} type="number" class="border-2 border-yellow-500 rounded-lg w-full mt-4" />
+            {/if}
+            <div class="mt-4 flex justify-end">
+                <Button color="red" class="mr-2" onclick={closeModal}>Cancel</Button>
+                <Button color="yellow" onclick={confirmAction}>Confirm</Button>
+            </div>
+        </div>
+    </div>
+    {/if}
+</main>
