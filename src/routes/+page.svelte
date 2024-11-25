@@ -45,29 +45,48 @@
     }
 
     function confirmAction() {
-    closeModal();
-    if (actionType === 'deposit') {
-        deposit(amountInput);
-    } else if (actionType === 'withdraw') {
-        withdraw(amountInput);
-    } else if (actionType === 'checkBalance') {
-        alert(`Current balance: $${balance}`); // Show balance in an alert
-    } else if (actionType === 'exit') {
-        isAuthenticated = false; // Go back to authentication
-        alert("Exiting the application. Please log in again."); // Optional message
-    } else if (actionType === 'resetUser ') {
-        resetUser ();
-    } else if (actionType === 'changePin') {
-        changePin();
+        closeModal();
+        if (actionType === 'deposit') {
+            deposit(amountInput);
+        } else if (actionType === 'withdraw') {
+            withdraw(amountInput);
+        } else if (actionType === 'checkBalance') {
+            alert(`Current balance: $${balance}`); // Show balance in an alert
+        } else if (actionType === 'exit') {
+            isAuthenticated = false; // Go back to authentication
+            alert("Exiting the application. Please log in again."); // Optional message
+        } else if (actionType === 'resetUser  ') {
+            resetUser ();
+        } else if (actionType === 'changePin') {
+            changePin();
+        }
     }
-}
 
-    function deposit(amount: number) {
+    async function deposit(amount: number) {
         if (amount <= 0) {
             alert("Deposit amount must be greater than zero.");
             return;
         }
         if (balance + amount <= 150000) {
+            const response = await fetch('http://routes.php/api/addtransaction', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    payload: [{
+                        user_id: 1, // Replace with the actual user ID
+                        transac_type: 'Deposit',
+                        amount: amount,
+                        balance_after: balance + amount,
+                        timestamp: new Date().toLocaleString(),
+                    }]
+                })
+            });
+            const data = await response.json();
+            if (data.msg) {
+                alert(data.msg);
+            }
             balance += amount;
             recordTransaction('Deposit', amount);
         } else {
@@ -75,12 +94,31 @@
         }
     }
 
-    function withdraw(amount: number) {
+    async function withdraw(amount: number) {
         if (amount <= 0) {
             alert("Withdrawal amount must be greater than zero.");
             return;
         }
         if (amount <= balance) {
+            const response = await fetch('http://your-api-url.com/api/addtransaction', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    payload: [{
+                        user_id: 1, // Replace with the actual user ID
+                        transac_type: 'Withdrawal',
+                        amount: amount,
+                        balance_after: balance - amount,
+                        timestamp: new Date().toLocaleString(),
+                    }]
+                })
+            });
+            const data = await response.json();
+            if (data.msg) {
+                alert(data.msg);
+            }
             balance -= amount;
             recordTransaction('Withdrawal', amount);
         } else {
@@ -109,8 +147,8 @@
         openModal("Are you sure you want to exit?", 'exit');
     }
 
-    function resetUser  () {
-        openModal("Are you sure you want to reset the user?", 'resetUser  ');
+    function resetUser () {
+        openModal("Are you sure you want to reset the user?", 'reset User ');
     }
 
     function changePin() {
