@@ -1,233 +1,257 @@
-<script lang="ts">
-    import { Button, Input } from 'flowbite-svelte';
-
-    interface TaskDetails {
-        id: number;
-        name: string;
-        status: string;
-    }
-
-    interface Transaction {
-        type: string;
-        amount: number;
-        balanceAfter: number;
-        timestamp: string;
-    }
-
-    let tasks: TaskDetails[] = $state([]);
-    let taskName = $state('');
-    let taskStatus = $state('');
-    let balance = $state(0);
-    let pin = '1234';
-    let enteredPin = $state('');
-    let isAuthenticated = $state(false);
-    let transactionHistory: Transaction[] = $state([]);
-
-    let depositAmount = $state(0);
-    let withdrawAmount = $state(0);
-    let newPin = $state('');
-    let confirmPin = $state('');
-
-    let showModal = $state(false);
-    let modalMessage = $state('');
-    let actionType = $state('');
-    let amountInput = $state(0); // New state for input amount
-
-    function openModal(message: string, action: string) {
-        modalMessage = message;
-        actionType = action;
-        amountInput = 0; // Reset input amount when opening modal
-        showModal = true;
-    }
-
-    function closeModal() {
-        showModal = false;
-    }
-
-    function confirmAction() {
-        closeModal();
-        if (actionType === 'deposit') {
-            deposit(amountInput);
-        } else if (actionType === 'withdraw') {
-            withdraw(amountInput);
-        } else if (actionType === 'checkBalance') {
-            alert(`Current balance: $${balance}`); // Show balance in an alert
-        } else if (actionType === 'exit') {
-            isAuthenticated = false; // Go back to authentication
-            alert("Exiting the application. Please log in again."); // Optional message
-        } else if (actionType === 'resetUser  ') {
-            resetUser ();
-        } else if (actionType === 'changePin') {
-            changePin();
-        }
-    }
-
-    async function deposit(amount: number) {
-        if (amount <= 0) {
-            alert("Deposit amount must be greater than zero.");
-            return;
-        }
-        if (balance + amount <= 150000) {
-            const response = await fetch('http://routes.php/api/addtransaction', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    payload: [{
-                        user_id: 1, // Replace with the actual user ID
-                        transac_type: 'Deposit',
-                        amount: amount,
-                        balance_after: balance + amount,
-                        timestamp: new Date().toLocaleString(),
-                    }]
-                })
-            });
-            const data = await response.json();
-            if (data.msg) {
-                alert(data.msg);
-            }
-            balance += amount;
-            recordTransaction('Deposit', amount);
-        } else {
-            alert("Cannot deposit: Maximum balance limit of $150,000 exceeded.");
-        }
-    }
-
-    async function withdraw(amount: number) {
-        if (amount <= 0) {
-            alert("Withdrawal amount must be greater than zero.");
-            return;
-        }
-        if (amount <= balance) {
-            const response = await fetch('http://your-api-url.com/api/addtransaction', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    payload: [{
-                        user_id: 1, // Replace with the actual user ID
-                        transac_type: 'Withdrawal',
-                        amount: amount,
-                        balance_after: balance - amount,
-                        timestamp: new Date().toLocaleString(),
-                    }]
-                })
-            });
-            const data = await response.json();
-            if (data.msg) {
-                alert(data.msg);
-            }
-            balance -= amount;
-            recordTransaction('Withdrawal', amount);
-        } else {
-            alert("Insufficient balance");
-        }
-    }
-
-    function recordTransaction(type: string, amount: number) {
-        transactionHistory.push({
-            type,
-            amount,
-            balanceAfter: balance,
-            timestamp: new Date().toLocaleString(),
+<script>
+    import { onMount } from 'svelte';
+  
+    let balance = 0;
+    let amount = '';
+    let pin = '';
+    let isAuthenticated = false;
+    let message = '';
+    let userId = '1'; // This would normally come from authentication
+    /**
+   * @type {any[]}
+   */
+    let transactions = [];
+  
+    const API_URL = 'http://localhost/atm';
+  
+    /**
+   * @param {{ payload: { user_id: string; transac_type: any; amount: number; balance_after: number; timestamp: string; }[]; }} data
+   */
+    async function encryptData(data) {
+      try {
+        const response = await fetch(`${API_URL}/routes.php?request=encryptdata`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
         });
+        const result = await response.json();
+        return result;
+      } catch (error) {
+        console.error('Encryption error:', error);
+        throw error;
+      }
     }
-
+  
+    /**
+   * @param {string} type
+   */
+    async function performTransaction(type) {
+      const numAmount = parseFloat(amount);
+      if (!amount || isNaN(numAmount) || numAmount <= 0) {
+        message = 'Please enter a valid amount';
+        return;
+      }
+  
+      if (type === 'withdraw' && parseFloat(amount) > balance) {
+        message = 'Insufficient funds';
+        return;
+      }
+  
+      const transactionData = {
+        payload: [{
+          user_id: userId,
+          transac_type: type,
+          amount: parseFloat(amount),
+          balance_after: type === 'withdraw' ? balance - parseFloat(amount) : balance + parseFloat(amount),
+          timestamp: new Date().toISOString()
+        }]
+      };
+  
+      try {
+        const encryptedData = await encryptData(transactionData);
+        const response = await fetch(`${API_URL}/routes.php?request=addtransaction`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: encryptedData
+        });
+  
+        const result = await response.json();
+        
+        if (result.success) {
+          balance = transactionData.payload[0].balance_after;
+          message = `${type.charAt(0).toUpperCase() + type.slice(1)} successful`;
+          amount = '';
+          await loadTransactions();
+        } else {
+          message = result.error || 'Transaction failed';
+        }
+      } catch (error) {
+        message = 'Error processing transaction';
+        console.error(error);
+      }
+    }
+  
+    async function loadTransactions() {
+      try {
+        const response = await fetch(`${API_URL}/routes.php?request=gettransactions/${userId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const result = await response.json();
+        
+        if (Array.isArray(result)) {
+          transactions = result;
+          balance = transactions.reduce((acc, trans) => {
+            return trans.transac_type === 'deposit' 
+              ? acc + parseFloat(trans.amount) 
+              : acc - parseFloat(trans.amount);
+          }, 0);
+        } else {
+          console.error('Invalid transactions data:', result);
+          message = 'Error loading transactions';
+        }
+      } catch (error) {
+        console.error('Error loading transactions:', error);
+        message = 'Error loading transactions';
+      }
+    }
+  
     function authenticate() {
-        if (enteredPin === pin) {
-            isAuthenticated = true;
-        } else {
-            alert("Incorrect PIN");
-        }
+      if (pin === '1234') {
+        isAuthenticated = true;
+        loadTransactions();
+      } else {
+        message = 'Invalid PIN';
+      }
     }
-
-    function exit() {
-        openModal("Are you sure you want to exit?", 'exit');
-    }
-
-    function resetUser () {
-        openModal("Are you sure you want to reset the user?", 'reset User ');
-    }
-
-    function changePin() {
-        if (newPin === confirmPin && newPin.length === 4) {
-            pin = newPin;
-            alert("PIN changed successfully!");
-            newPin = '';
-            confirmPin = '';
-        } else {
-            alert("PINs do not match or are invalid.");
-        }
-    }
-</script>
-
-<main class="flex flex-col h-screen p-8 bg-gray-100">
-    <div class="max-w-full mx-auto bg-blue-800 shadow-lg rounded-lg p-6 flex-1">
-        {#if !isAuthenticated}
-        <h2 class="text-xl font-bold mb-4 text-center">BD<span style="color: yellow">O</span></h2>
-        <div class="grid grid-cols-1 gap-4 w-full">
-            <Input placeholder="Enter your PIN" bind:value={enteredPin} type="password" class ="border-2 border-yellow-500 rounded-lg w-full" />
-            <Button color="yellow" class="w-full" onclick={authenticate}>Authenticate</Button>
+  
+    onMount(() => {
+      if (isAuthenticated) {
+        loadTransactions();
+      }
+    });
+  </script>
+  
+  <main class="container">
+    {#if !isAuthenticated}
+      <div class="auth-container">
+        <h2>Welcome to ATM</h2>
+        <input
+          type="password"
+          bind:value={pin}
+          placeholder="Enter PIN"
+          maxlength="4"
+        />
+        <button on:click={authenticate}>Login</button>
+      </div>
+    {:else}
+      <div class="atm-container">
+        <h2>ATM Machine</h2>
+        <div class="balance">Current Balance: ${balance.toFixed(2)}</div>
+        
+        <div class="transaction-form">
+          <input
+            type="number"
+            bind:value={amount}
+            placeholder="Enter amount"
+            min="0"
+          />
+          <div class="buttons">
+            <button on:click={() => performTransaction('deposit')}>Deposit</button>
+            <button 
+              on:click={() => performTransaction('withdraw')}
+              disabled={parseFloat(amount) > balance}
+            >
+              Withdraw
+            </button>
+          </div>
         </div>
-        {:else}
-            <h2 class="text-xl font-bold mb-4 text-center">Welcome to BDO ATM</h2>
-            <div class="grid grid-cols-2 gap-4 mt-4">
-                <Button color="yellow" class="w-full" onclick={() => openModal("Enter deposit amount:", 'deposit')}>Deposit</Button>
-            </div>
-            <div class="grid grid-cols-2 gap-4 mt-4">
-                <Button color="yellow" class="w-full" onclick={() => openModal("Enter withdrawal amount:", 'withdraw')}>Withdraw</Button>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4 mt-4">
-                <Button color="yellow" class="w-full" onclick={() => openModal("Current balance: $" + balance, 'checkBalance')}>Check Balance</Button>
-                <Button color="yellow" class="w-full" onclick={exit}>Exit</Button>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4 mt-4">
-                <Button color="yellow" class="w-full mt-2" onclick={() => openModal("Are you sure you want to change your PIN?", 'changePin')}>Change PIN</Button>
-            </div>
-
-            <div class="mt-4">
-                <h3 class="text-lg font-semibold">Change PIN</h3>
-                <Input placeholder="New PIN" bind:value={newPin} type="password" class="border-2 border-yellow-500 rounded-lg w-full" />
-                <Input placeholder="Confirm New PIN" bind:value={confirmPin} type="password" class="border-2 border-yellow-500 rounded-lg w-full" />
-            </div>
-
-            <div class="mt-4">
-                <p class="font-bold">Current Balance: $<span class="text-black-600">{balance}</span></p>
-            </div>
-
-            <div class="mt-4">
-                <h3 class="text-lg font-semibold">Transaction History</h3>
-                {#if transactionHistory.length > 0}
-                    <ul class="list-disc pl-5">
-                        {#each transactionHistory as transaction}
-                            <li>{transaction.timestamp}: {transaction.type} of $<span class="font-semibold">{transaction.amount}</span>. Balance after: $<span class="font-semibold">{transaction.balanceAfter}</span></li>
-                        {/each}
-                    </ul>
-                {:else}
-                    <p>No transactions yet.</p>
-                {/if}
-            </div>
-
-            <Button color="red" class="w-full mt-4" onclick={resetUser }>Reset User</Button>
+  
+        {#if message}
+          <div class="message">{message}</div>
         {/if}
-    </div>
-
-    {#if showModal}
-    <div class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-        <div class="bg-white p-6 rounded-lg shadow-lg">
-            <h3 class="text-lg font-semibold">{modalMessage}</h3>
-            {#if actionType === 'deposit' || actionType === 'withdraw'}
-                <Input placeholder="Amount" bind:value={amountInput} type="number" class="border-2 border-yellow-500 rounded-lg w-full mt-4" />
-            {/if}
-            <div class="mt-4 flex justify-end">
-                <Button color="red" class="mr-2" onclick={closeModal}>Cancel</Button>
-                <Button color="yellow" onclick={confirmAction}>Confirm</Button>
-            </div>
+  
+        <div class="transactions">
+          <h3>Recent Transactions</h3>
+          <div class="transaction-list">
+            {#each transactions as transaction}
+              <div class="transaction-item">
+                <span>{transaction.transac_type}</span>
+                <span>${transaction.amount.toFixed(2)}</span>
+                <span>{new Date(transaction.timestamp).toLocaleString()}</span>
+              </div>
+            {/each}
+          </div>
         </div>
-    </div>
+      </div>
     {/if}
-</main>
+  </main>
+  
+  <style>
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+  
+    .auth-container,
+    .atm-container {
+      background: #f5f5f5;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+  
+    .balance {
+      font-size: 24px;
+      margin: 20px 0;
+      padding: 10px;
+      background: #e0e0e0;
+      border-radius: 4px;
+    }
+  
+    .transaction-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+  
+    .buttons {
+      display: flex;
+      gap: 10px;
+    }
+  
+    input {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+  
+    button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+  
+    button:disabled {
+      background: #cccccc;
+      cursor: not-allowed;
+    }
+  
+    .message {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+      background: #e3f2fd;
+    }
+  
+    .transactions {
+      margin-top: 20px;
+    }
+  
+    .transaction-list {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+  
+    .transaction-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+  </style>

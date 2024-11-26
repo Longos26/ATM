@@ -1,15 +1,14 @@
 <?php
- header("Access-Control-Allow-Origin: *");
- header("Context-Type: application/json; charset=utf-8");
- date_default_timezone_set("Asia/Manila");
- set_time_limit(1000);
+header("Content-Type: application/json; charset=utf-8");
+date_default_timezone_set("Asia/Manila");
+set_time_limit(1000);
 
- define("SERVER", "localhost");
-  define("DBASE", "atm");
-  define("USER", "");
-  define("PASSWORD", "");
+define("SERVER", "localhost");
+define("DBASE", "atm");
+define("USER", "RomarATM");
+define("PASSWORD", "Romar026");
 
-  class Connection {
+class Connection {
     private $conString = "mysql:host=".SERVER.";dbname=".DBASE.";charset=utf8mb4";
     private $options = [
         \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
@@ -19,12 +18,11 @@
     ];
 
     public function connect() {
-      $conn = false;
-      try {
-          $conn = new \PDO($this->conString, USER, PASSWORD, $this->options);
-      } catch (\Throwable $th) {
-          echo "Connection error: " . $th->getMessage();//throw $th;
-      }
-      return $conn;
-  }
+        try {
+            return new \PDO($this->conString, USER, PASSWORD, $this->options);
+        } catch (\PDOException $e) {
+            error_log("Database connection failed: " . $e->getMessage());
+            return false;
+        }
+    }
 }
