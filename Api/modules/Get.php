@@ -9,7 +9,7 @@ class Get {
     public function getTransactions($userId = null) {
         $sqlString = "SELECT * FROM transactions";
         if ($userId) {
-            $sqlString .= " WHERE user_id=?";
+            $sqlString .= " WHERE user _id=?";
         }
         $res = [];
         try {
@@ -26,3 +26,4 @@ class Get {
         return $res;
     }
 }
+?>

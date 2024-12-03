@@ -36,7 +36,7 @@ switch ($_SERVER['REQUEST_METHOD']) {
             switch ($req[0]) {
                 case 'gettransactions':
                     if (!isset($req[1])) {
-                        throw new Exception("User ID is required");
+                        throw new Exception("User  ID is required");
                     }
                     $result = $get->getTransactions($req[1]);
                     echo json_encode($result);

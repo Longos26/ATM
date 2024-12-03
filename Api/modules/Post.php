@@ -54,8 +54,10 @@ class Post {
                 $param->timestamp,
                 $param->id
             ]);
+            $res = ["success" => true, "message" => "Transaction updated successfully"];
         } catch (\Throwable $th) {
             $res = [
+                "success" => false,
                 "msg" => "Unable to update data", 
                 "error" => $th->getMessage(),
                 "code" => $th->getCode()
@@ -70,8 +72,10 @@ class Post {
         try {
             $stmt = $this->pdo->prepare($sqlString);
             $stmt->execute([$param]);
+            $res = ["success" => true, "message" => "Transaction deleted successfully"];
         } catch (\Throwable $th) {
             $res = [
+                "success" => false,
                 "msg" => "Unable to delete data", 
                 "error" => $th->getMessage(),
                 "code" => $th->getCode()
@@ -80,3 +84,4 @@ class Post {
         return $res;
     }
 }
+?>

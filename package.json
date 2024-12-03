@@ -19,8 +19,9 @@
 		"flowbite-svelte": "^0.47.3",
 		"svelte": "^5.0.0",
 		"svelte-check": "^4.0.0",
+		"svelte-preprocess": "^6.0.3",
 		"tailwindcss": "^3.4.9",
-		"typescript": "^5.0.0",
+		"typescript": "^5.7.2",
 		"vite": "^5.0.3"
 	}
 }

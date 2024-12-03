@@ -1,15 +1,15 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  let balance = 0;
-  let amount = '';
-  let pin = '';
-  let isAuthenticated = false;
-  let message = '';
-  let userId = '1'; // Mock user ID for demonstration
-  let transactions: any[] = []; 
-  
-  async function fetchWithDebug(url: string, options: any) {
+  let balance: number = 0;
+  let amount: string = '';
+  let pin: string = '';
+  let isAuthenticated: boolean = false;
+  let message: string = '';
+  let userId: string = '1'; // Mock user ID for demonstration
+  let transactions: Array<{ transac_type: string, amount: number, timestamp: string }> = [];
+
+  async function fetchWithDebug(url: string, options: RequestInit) {
     try {
       const response = await fetch(url, options);
       if (!response.ok) {
@@ -93,10 +93,12 @@
       });
 
       if (Array.isArray(result)) {
-        transactions = result;
-        balance = result.reduce((acc, trans) => {
-          const amount = parseFloat(trans.amount);
-          return trans.transac_type === 'deposit' ? acc + amount : acc - amount;
+        transactions = result.map(trans => ({
+          ...trans,
+          amount: parseFloat(trans.amount)
+        }));
+        balance = transactions.reduce((acc, trans) => {
+          return trans.transac_type === 'deposit' ? acc + trans.amount : acc - trans.amount;
         }, 0);
       } else {
         throw new Error('Invalid transactions data');
@@ -116,6 +118,12 @@
     }
   }
 
+  function logout() {
+    isAuthenticated = false;
+    pin = '';
+    message = 'Logged out successfully';
+  }
+
   onMount(() => {
     if (isAuthenticated) {
       loadTransactions();
@@ -123,33 +131,36 @@
   });
 </script>
 
-<main class="container">
+<main class="max-w-lg mx-auto p-5">
   {#if !isAuthenticated}
-    <div class="auth-container">
-      <h2>Welcome to ATM</h2>
+    <div class="bg-gray-100 p-5 rounded-lg shadow-md">
+      <h2 class="text-2xl font-bold mb-4">Welcome to ATM</h2>
       <input
         type="password"
         bind:value={pin}
         placeholder="Enter PIN"
         maxlength="4"
+        class="w-full p-2 border border-gray-300 rounded mb-4"
       />
-      <button on:click={authenticate}>Login</button>
+      <button class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600" on:click={authenticate}>Login</button>
     </div>
   {:else}
-    <div class="atm-container">
-      <h2>ATM Machine</h2>
-      <div class="balance">Current Balance: ${balance.toFixed(2)}</div>
+    <div class="bg-gray-100 p-5 rounded-lg shadow-md">
+      <h2 class="text-2xl font-bold mb-4">ATM Machine</h2>
+      <div class="text-xl font-semibold mb-4">Current Balance: ${balance.toFixed(2)}</div>
       
-      <div class="transaction-form">
+      <div class="flex flex-col gap-4 mb-4">
         <input
           type="number"
           bind:value={amount}
           placeholder="Enter amount"
           min="0"
+          class="w-full p-2 border border-gray-300 rounded"
         />
-        <div class="buttons">
-          <button on:click={() => performTransaction('deposit')}>Deposit</button>
+        <div class="flex gap-4">
+          <button class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600" on:click={() => performTransaction('deposit')}>Deposit</button>
           <button 
+            class="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600 disabled:bg-gray-400"
             on:click={() => performTransaction('withdraw')}
             disabled={parseFloat(amount) > balance}
           >
@@ -159,14 +170,14 @@
       </div>
   
       {#if message}
-        <div class="message">{message}</div>
+        <div class="p-3 mb-4 rounded bg-blue-100 text-blue-800">{message}</div>
       {/if}
   
-      <div class="transactions">
-        <h3>Recent Transactions</h3>
-        <div class="transaction-list">
+      <div class="mt-4">
+        <h3 class="text-lg font-semibold mb-2">Recent Transactions</h3>
+        <div class="max-h-72 overflow-y-auto">
           {#each transactions as transaction}
-            <div class="transaction-item">
+            <div class="flex justify-between p-2 border-b border-gray-200">
               <span>{transaction.transac_type}</span>
               <span>${transaction.amount.toFixed(2)}</span>
               <span>{new Date(transaction.timestamp).toLocaleString()}</span>
@@ -174,85 +185,8 @@
           {/each}
         </div>
       </div>
+
+      <button class="w-full mt-4 bg-gray-500 text-white py-2 rounded hover:bg-gray-600" on:click={logout}>Exit</button>
     </div>
   {/if}
 </main>
-
-<style>
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-  
-    .auth-container,
-    .atm-container {
-      background: #f5f5f5;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-  
-    .balance {
-      font-size: 24px;
-      margin: 20px 0;
-      padding: 10px;
-      background: #e0e0e0;
-      border-radius: 4px;
-    }
-  
-    .transaction-form {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-  
-    .buttons {
-      display: flex;
-      gap: 10px;
-    }
-  
-    input {
-      padding: 8px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-  
-    button {
-      padding: 8px 16px;
-      border: none;
-      border-radius: 4px;
-      background: #007bff;
-      color: white;
-      cursor: pointer;
-    }
-  
-    button:disabled {
-      background: #cccccc;
-      cursor: not-allowed;
-    }
-  
-    .message {
-      padding: 10px;
-      margin: 10px 0;
-      border-radius: 4px;
-      background: #e3f2fd;
-    }
-  
-    .transactions {
-      margin-top: 20px;
-    }
-  
-    .transaction-list {
-      max-height: 300px;
-      overflow-y: auto;
-    }
-  
-    .transaction-item {
-      display: flex;
-      justify-content: space-between;
-      padding: 10px;
-      border-bottom: 1px solid #ddd;
-    }
-</style>
