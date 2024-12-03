@@ -1,7 +1,8 @@
 <?php
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
+header("Access-Control-Max-Age: 3600");
 header("Content-Type: application/json");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -17,13 +18,9 @@ require_once("./modules/Auth.php");
 $db = new Connection();
 $pdo = $db->connect();
 
-// Check if database connection was successful
 if (!$pdo) {
-    header('HTTP/1.1 500 Internal Server Error');
-    echo json_encode([
-        "success" => false,
-        "error" => "Database connection failed"
-    ]);
+    http_response_code(500);
+    echo json_encode(["success" => false, "error" => "Database connection failed"]);
     exit();
 }
 
@@ -31,15 +28,26 @@ $get = new Get($pdo);
 $post = new Post($pdo);
 $auth = new Auth($pdo);
 
-if (isset($_REQUEST['request'])) {
-    $req = explode('/', rtrim($_REQUEST['request'], '/'));
-} else {
-    $req = array("errorcatcher");
-}
+$req = isset($_REQUEST['request']) ? explode('/', rtrim($_REQUEST['request'], '/')) : ["errorcatcher"];
 
 switch ($_SERVER['REQUEST_METHOD']) {
     case 'GET':
-        echo json_encode(["error" => "No public API available"]);
+        try {
+            switch ($req[0]) {
+                case 'gettransactions':
+                    if (!isset($req[1])) {
+                        throw new Exception("User ID is required");
+                    }
+                    $result = $get->getTransactions($req[1]);
+                    echo json_encode($result);
+                    break;
+                default:
+                    throw new Exception("Invalid request");
+            }
+        } catch (Exception $e) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "error" => $e->getMessage()]);
+        }
         break;
 
     case 'POST':
@@ -49,9 +57,16 @@ switch ($_SERVER['REQUEST_METHOD']) {
                 throw new Exception("No data received");
             }
             
-            $d = json_decode($auth->decryptData($rawData));
-            if (!$d) {
-                throw new Exception("Invalid data format: " . json_last_error_msg());
+            $d = null;
+            if ($req[0] === 'encryptdata') {
+                $data = json_decode($rawData, true);
+                echo json_encode($auth->encryptData($data));
+                exit;
+            } else {
+                $d = $auth->decryptData($rawData);
+                if (!$d) {
+                    throw new Exception("Invalid encrypted data");
+                }
             }
 
             $result = null;
@@ -68,34 +83,21 @@ switch ($_SERVER['REQUEST_METHOD']) {
                     break;
 
                 case 'updatetransaction':
-                    echo json_encode($post->updateTransaction($d));
+                    $result = $post->updateTransaction($d);
                     break;
 
                 case 'deletetransaction':
-                    echo json_encode($post->deleteTransaction($d->id));
+                    $result = $post->deleteTransaction($d->id);
                     break;
 
-                case 'encryptpword':
-                    echo json_encode($auth->encryptPassword("Sample Password"));
-                    break;
-
-                case 'encryptdata':
-                    echo json_encode($auth->encryptData(array("data" => "Hello World")));
-                    break;
-
-                case 'decryptdata':
-                    echo json_encode($auth->decryptData("eyJkYXRhIjoicG55RW5Jak5RMXpSdzJKTXUzVVRjVjgyQUt qXC9aUVc5b1dKWHNEVkxZT0U9IiwiaXYiOiJPREU0WXpBMk1UbGhPREEzTW1OaE5qVmxNVGd3TURrMU5tUm1ZMlE0WWpFPSJ9"));
-                    break;
+                default:
+                    throw new Exception("Invalid request");
             }
             
             echo json_encode($result);
         } catch (Exception $e) {
             http_response_code(400);
-            echo json_encode([
-                "success" => false,
-                "error" => $e->getMessage(),
-                "code" => $e->getCode()
-            ]);
+            echo json_encode(["success" => false, "error" => $e->getMessage()]);
         }
         break;
 
@@ -103,3 +105,4 @@ switch ($_SERVER['REQUEST_METHOD']) {
         echo json_encode(["error" => "Method not allowed"]);
         break;
 }
+?>
