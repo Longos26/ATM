@@ -172,7 +172,7 @@
 
 <main class="max-w-lg mx-auto p-5 bg-bdo-blue">
   <div class="flex justify-center mb-4">
-    <img src="/download.png" alt="BDO Logo" class="h-24 w-auto rounded-lg" />
+    <img src="https://www.google.com/search?sca_esv=c9bd33c212e8a1a7&sxsrf=ADLYWIIc63svpgioEBvPxj9HpgPLcSz-YQ:1733373114621&q=BDO&stick=H4sIAAAAAAAAAOMwVGI0-MXIsIGF4RULPxevfrq-oWFSsmlhVVVKGpJIUlGuZV5GOqqasuISSySRcsOq8rT4DGQ1ZrkpxTnmKCLGSfHm2SjmWJjlmVahqEmLN6wwRogkGxeUxFsY5S1iZXZy8b_FJsnQ_bTHODA-pOCdSvNBqUN7ljw1-bludpn3qkUcYgGp-QU5qQqJOcX5CsWpiUXJGQpp-UUrOBgBU5L86esAAAA&sa=X&ved=2ahUKEwiSmYqG5o-KAxV4qVYBHd4iBxEQs9oBKAB6BAhOEAk&biw=1536&bih=742&dpr=1.25#" alt="BDO Logo" class="h-24 w-auto rounded-lg" />
   </div>
   {#if !isAuthenticated}
     <div class="bg-white p-5 rounded-lg shadow-md">
