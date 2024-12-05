@@ -9,34 +9,29 @@
   let userId: string = '1'; // Mock user ID for demonstration
   let transactions: Array<{ transac_type: string, amount: number, timestamp: string }> = [];
 
-  async function fetchWithDebug(url: string, options: RequestInit) {
-    try {
-      const response = await fetch(url, options);
-      if (!response.ok) {
-        const errorDetails = await response.text();
-        console.error(`API Error: ${response.status} - ${errorDetails}`);
-        throw new Error(`API Error: ${response.statusText}`);
-      }
-      return response.json();
-    } catch (error) {
-      console.error('Network Error:', error);
-      throw error;
-    }
+  function mockEncryptData(data: any) {
+    return JSON.stringify(data);
   }
 
-  async function encryptData(data: any) {
-    try {
-      const response = await fetchWithDebug(`/Api/routes.php?request=encryptdata`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      return response.encryptedData; // Adjust this based on your backend response format
-    } catch (error) {
-      message = 'Encryption error';
-      console.error('Encryption error:', error);
-      throw error;
-    }
+  function mockFetchWithDebug(url: string, options: RequestInit) {
+    return new Promise((resolve, reject) => {
+      try {
+        if (url.includes('addtransaction')) {
+          const transactionData = JSON.parse(options.body as string);
+          const storedTransactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+          storedTransactions.push(transactionData.payload[0]);
+          localStorage.setItem('transactions', JSON.stringify(storedTransactions));
+          resolve({ success: true });
+        } else if (url.includes('gettransactions')) {
+          const storedTransactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+          resolve(storedTransactions);
+        } else {
+          reject('Invalid request');
+        }
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
   async function performTransaction(type: string) {
@@ -62,15 +57,20 @@
         }]
       };
 
-      // First encrypt the data
-      const encryptedResponse = await encryptData(transactionData);
-      
-      // Then send the encrypted data
-      const result = await fetchWithDebug(`/Api/routes.php?request=addtransaction`, {
+      const encryptedResponse = mockEncryptData(transactionData);
+
+      // Simulate sending the encrypted data
+      await mockFetchWithDebug(`/Api/routes.php?request=addtransaction`, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain' }, // Changed to text/plain for encrypted data
+        headers: { 'Content-Type': 'text/plain' },
         body: encryptedResponse
       });
+
+      const result = await mockFetchWithDebug(`/Api/routes.php?request=addtransaction`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: encryptedResponse
+      }) as { success: boolean };
 
       if (result.success) {
         balance = transactionData.payload[0].balance_after;
@@ -78,7 +78,7 @@
         amount = '';
         await loadTransactions();
       } else {
-        message = result.error || 'Transaction failed';
+        message = 'Transaction failed';
       }
     } catch (error) {
       message = 'Error processing transaction';
@@ -88,7 +88,7 @@
 
   async function loadTransactions() {
     try {
-      const result = await fetchWithDebug(`/Api/routes.php?request=gettransactions/${userId}`, {
+      const result = await mockFetchWithDebug(`/Api/routes.php?request=gettransactions/${userId}`, {
         method: 'GET'
       });
 
@@ -168,11 +168,11 @@
           </button>
         </div>
       </div>
-  
+
       {#if message}
         <div class="p-3 mb-4 rounded bg-blue-100 text-blue-800">{message}</div>
       {/if}
-  
+
       <div class="mt-4">
         <h3 class="text-lg font-semibold mb-2">Recent Transactions</h3>
         <div class="max-h-72 overflow-y-auto">
