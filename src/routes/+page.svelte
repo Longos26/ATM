@@ -172,7 +172,7 @@
 
 <main class="max-w-lg mx-auto p-5 bg-bdo-blue">
   <div class="flex justify-center mb-4">
-    <img src="/download.png" alt="BDO Logo" class="responsive-logo" />
+    <img src="/download.png" alt="BDO Logo" class="h-24 w-auto rounded-lg" />
   </div>
   {#if !isAuthenticated}
     <div class="bg-white p-5 rounded-lg shadow-md">
@@ -249,12 +249,6 @@
   }
 
   .bg-bdo-blue {
-    background-color: #014ea8;
-  }
-
-  .responsive-logo {
-    max-width: 100%;
-    height: auto;
-    border-radius: 15px;
+    background-color: #014ea8; /* Updated background color */
   }
 </style>
